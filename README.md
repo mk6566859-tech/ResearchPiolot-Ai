@@ -47,4 +47,8 @@ GROQ_API_KEY = "your-key"
 GROQ_MODEL = "openai/gpt-oss-120b"
 ```
 
+The app limits report generation to reduce Groq token-per-minute errors. If
+`openai/gpt-oss-120b` is temporarily rate-limited, it waits for the reported
+window and retries the same model up to two times.
+
 Do not commit `.streamlit/secrets.toml`.

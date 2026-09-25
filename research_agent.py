@@ -1,9 +1,16 @@
+import re
+import time
+
 from crewai import Agent, Task, Crew, Process
-from llm_config import get_groq_llm
+from llm_config import (
+    get_groq_llm,
+    get_groq_model_name,
+    is_rate_limit_error,
+)
 from search_tools import duckduckgo_search
 
-def create_research_agent():
-    llm = get_groq_llm()
+def create_research_agent(model_name=None):
+    llm = get_groq_llm(model_name)
 
     researcher = Agent(
         role="Senior Research Analyst",
@@ -22,15 +29,13 @@ def create_research_agent():
         llm=llm,
         verbose=True,
         allow_delegation=False,
-        max_iter=10,
+        max_iter=4,
     )
     return researcher
 
 
-def run_research(topic: str):
-    researcher = create_research_agent()
-
-    research_task = Task(
+def create_research_task(topic, researcher):
+    return Task(
         description=f"""
 Conduct comprehensive research on:
 
@@ -70,10 +75,29 @@ The report must be factual, organized, readable, and supported by web research.
         agent=researcher,
     )
 
-    crew = Crew(
-        agents=[researcher],
-        tasks=[research_task],
-        process=Process.sequential,
-        verbose=True,
-    )
-    return crew.kickoff()
+
+def run_research(topic: str):
+    configured_model = get_groq_model_name()
+    for attempt in range(3):
+        try:
+            researcher = create_research_agent(configured_model)
+            crew = Crew(
+                agents=[researcher],
+                tasks=[create_research_task(topic, researcher)],
+                process=Process.sequential,
+                verbose=True,
+            )
+            return crew.kickoff()
+        except Exception as error:
+            if not is_rate_limit_error(error) or attempt == 2:
+                raise
+
+            wait_seconds = get_rate_limit_wait(error)
+            time.sleep(wait_seconds)
+
+
+def get_rate_limit_wait(error):
+    match = re.search(r"try again in ([\d.]+)s", str(error), re.IGNORECASE)
+    if match:
+        return min(float(match.group(1)) + 0.5, 30)
+    return 5

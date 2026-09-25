@@ -70,3 +70,6 @@ Add these secrets in Streamlit Cloud:
 
 GROQ_API_KEY = "your-key"
 GROQ_MODEL = "openai/gpt-oss-120b"
+
+The app caps generated output and retries the configured model after a
+rate-limit window.
